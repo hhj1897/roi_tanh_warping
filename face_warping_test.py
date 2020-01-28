@@ -6,43 +6,23 @@ from argparse import ArgumentParser
 from saic_vision.object_detector import S3FMobileV2Detector
 
 
-def warp_image(image, face_box, target_size, polar, anisotropic=False,
+def warp_image(image, face_box, target_size, polar,
                interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_DEFAULT):
     face_center = [(face_box[0] + face_box[2]) / 2.0, (face_box[1] + face_box[3]) / 2.0]
     if polar:
-        if anisotropic:
-            face_axes = [(face_box[2] - face_box[0]) / np.pi ** 0.5, (face_box[3] - face_box[1]) / np.pi ** 0.5]
-            half_target_size = [target_size[0] / 2.0, target_size[1] / 2.0]
+        target_size = np.array(target_size)
+        face_radii = [(face_box[2] - face_box[0]) / np.pi ** 0.5, (face_box[3] - face_box[1]) / np.pi ** 0.5]
 
-            dest_indices = np.stack(np.meshgrid(np.arange(target_size[0]), np.arange(target_size[1])),
-                                    axis=-1).astype(float) + 0.5 - np.array(target_size) / 2.0
-            dest_radii = np.linalg.norm(dest_indices, axis=-1)
-            orientation_x = dest_indices[..., 0] / np.clip(dest_radii, 1e-9, None)
-            orientation_y = dest_indices[..., 1] / np.clip(dest_radii, 1e-9, None)
-            orientation_y[orientation_x == 0] = 1.0
+        dest_indices = np.stack(np.meshgrid(np.arange(target_size[0]), np.arange(target_size[1])),
+                                axis=-1).astype(float)
+        normalised_dest_indices = (dest_indices + 0.5 - target_size / 2.0) / target_size * 2.0
+        radii = np.linalg.norm(normalised_dest_indices, axis=-1)
+        orientation_x = normalised_dest_indices[..., 0] / np.clip(radii, 1e-9, None)
+        orientation_y = normalised_dest_indices[..., 1] / np.clip(radii, 1e-9, None)
 
-            face_radii = face_axes[0] * face_axes[1] / ((face_axes[1] * orientation_x) ** 2 +
-                                                        (face_axes[0] * orientation_y) ** 2) ** 0.5
-            thresholds = half_target_size[0] * half_target_size[1] / (((half_target_size[1] * orientation_x) ** 2 +
-                                                                       (half_target_size[0] * orientation_y) ** 2) **
-                                                                      0.5)
-            src_radii = np.arctanh(np.clip(dest_radii / thresholds, None, 1.0 - 1e-9))
-            src_x_indices = face_center[0] + face_radii * src_radii * orientation_x
-            src_y_indices = face_center[1] + face_radii * src_radii * orientation_y
-        else:
-            face_radius = ((face_box[2] - face_box[0]) * (face_box[3] - face_box[1]) / np.pi) ** 0.5
-            half_target_size = min(target_size[0], target_size[1]) / 2.0
-
-            dest_indices = np.stack(np.meshgrid(np.arange(target_size[0]), np.arange(target_size[1])),
-                                    axis=-1).astype(float)
-            normalised_dest_indices = (dest_indices + 0.5 - np.array(target_size) / 2.0) / half_target_size
-            radii = np.linalg.norm(normalised_dest_indices, axis=-1)
-            orientation_x = normalised_dest_indices[..., 0] / np.clip(radii, 1e-9, None)
-            orientation_y = normalised_dest_indices[..., 1] / np.clip(radii, 1e-9, None)
-
-            src_radii = np.arctanh(np.clip(radii, None, 1.0 - 1e-9))
-            src_x_indices = face_center[0] + face_radius * src_radii * orientation_x
-            src_y_indices = face_center[1] + face_radius * src_radii * orientation_y
+        src_radii = np.arctanh(np.clip(radii, None, 1.0 - 1e-9))
+        src_x_indices = face_center[0] + face_radii[0] * src_radii * orientation_x
+        src_y_indices = face_center[1] + face_radii[1] * src_radii * orientation_y
     else:
         half_face_size = [(face_box[2] - face_box[0]) / 2.0, (face_box[3] - face_box[1]) / 2.0]
 
@@ -65,39 +45,19 @@ def restore_image(warped_image, face_box, image_size, polar, anisotropic=False,
     face_center = [(face_box[0] + face_box[2]) / 2.0, (face_box[1] + face_box[3]) / 2.0]
 
     if polar:
-        if anisotropic:
-            face_axes = [(face_box[2] - face_box[0]) / np.pi ** 0.5, (face_box[3] - face_box[1]) / np.pi ** 0.5]
-            half_warped_size = [warped_size[0] / 2.0, warped_size[1] / 2.0]
+        face_radii = np.array([(face_box[2] - face_box[0]) / np.pi ** 0.5,
+                               (face_box[3] - face_box[1]) / np.pi ** 0.5])
 
-            dest_indices = np.stack(np.meshgrid(np.arange(image_size[0]), np.arange(image_size[1])),
-                                    axis=-1).astype(float) - np.array(face_center)
-            dest_radii = np.linalg.norm(dest_indices, axis=-1)
-            orientation_x = dest_indices[..., 0] / np.clip(dest_radii, 1e-9, None)
-            orientation_y = dest_indices[..., 1] / np.clip(dest_radii, 1e-9, None)
-            orientation_y[orientation_x == 0] = 1.0
+        dest_indices = np.stack(np.meshgrid(np.arange(image_size[0]), np.arange(image_size[1])),
+                                axis=-1).astype(float)
+        normalised_dest_indices = (dest_indices - np.array(face_center)) / face_radii
+        radii = np.linalg.norm(normalised_dest_indices, axis=-1)
+        orientation_x = normalised_dest_indices[..., 0] / np.clip(radii, 1e-9, None)
+        orientation_y = normalised_dest_indices[..., 1] / np.clip(radii, 1e-9, None)
 
-            face_radii = face_axes[0] * face_axes[1] / ((face_axes[1] * orientation_x) ** 2 +
-                                                        (face_axes[0] * orientation_y) ** 2) ** 0.5
-            thresholds = half_warped_size[0] * half_warped_size[1] / (((half_warped_size[1] * orientation_x) ** 2 +
-                                                                       (half_warped_size[0] * orientation_y) ** 2) **
-                                                                      0.5)
-            src_radii = np.tanh(dest_radii / face_radii)
-            src_x_indices = orientation_x * src_radii * thresholds + warped_size[0] / 2.0 - 0.5
-            src_y_indices = orientation_y * src_radii * thresholds + warped_size[1] / 2.0 - 0.5
-        else:
-            face_radius = ((face_box[2] - face_box[0]) * (face_box[3] - face_box[1]) / np.pi) ** 0.5
-            half_warped_size = min(warped_size[0], warped_size[1]) / 2.0
-
-            dest_indices = np.stack(np.meshgrid(np.arange(image_size[0]), np.arange(image_size[1])),
-                                    axis=-1).astype(float)
-            normalised_dest_indices = (dest_indices - np.array(face_center)) / face_radius
-            radii = np.linalg.norm(normalised_dest_indices, axis=-1)
-            orientation_x = normalised_dest_indices[..., 0] / np.clip(radii, 1e-9, None)
-            orientation_y = normalised_dest_indices[..., 1] / np.clip(radii, 1e-9, None)
-
-            src_radii = np.tanh(radii)
-            src_x_indices = orientation_x * src_radii * half_warped_size + warped_size[0] / 2.0 - 0.5
-            src_y_indices = orientation_y * src_radii * half_warped_size + warped_size[1] / 2.0 - 0.5
+        src_radii = np.tanh(radii)
+        src_x_indices = (orientation_x * src_radii + 1.0) * warped_size[0] / 2.0 - 0.5
+        src_y_indices = (orientation_y * src_radii + 1.0) * warped_size[1] / 2.0 - 0.5
     else:
         half_face_size = [(face_box[2] - face_box[0]) / 2.0, (face_box[3] - face_box[1]) / 2.0]
 
@@ -121,9 +81,6 @@ def main():
     parser.add_argument('-y', '--height', help='face height', type=int, default=256)
     parser.add_argument('-p', '--polar', help='use polar coordinates', action='store_true')
     parser.add_argument('-r', '--restore', help='show restored frames', action='store_true')
-    parser.add_argument('-a', '--anisotropic',
-                        help='anisotropic mapping (only matters when using polar coordinates)',
-                        action='store_true')
     args = parser.parse_args()
 
     # Make the models run a bit faster
@@ -160,10 +117,10 @@ def main():
 
                     # Warping
                     warped_frame = warp_image(frame, face_boxes[biggest_face_idx], (args.width, args.height),
-                                              args.polar, args.anisotropic, border_mode=cv2.BORDER_REPLICATE)
+                                              args.polar, border_mode=cv2.BORDER_REPLICATE)
                     if args.restore:
                         restored_frame = restore_image(warped_frame, face_boxes[biggest_face_idx], frame.shape[1::-1],
-                                                       args.polar, args.anisotropic, border_mode=cv2.BORDER_REPLICATE)
+                                                       args.polar, border_mode=cv2.BORDER_REPLICATE)
                     else:
                         restored_frame = None
 
