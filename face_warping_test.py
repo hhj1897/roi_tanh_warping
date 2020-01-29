@@ -6,8 +6,8 @@ from argparse import ArgumentParser
 from saic_vision.object_detector import S3FMobileV2Detector
 
 
-def warp_image(image, face_box, target_size, polar,
-               interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_CONSTANT):
+def warp_image(image, face_box, target_size, polar, interpolation=cv2.INTER_LINEAR,
+               border_mode=cv2.BORDER_CONSTANT, border_value=0):
     face_center = [(face_box[0] + face_box[2]) / 2.0, (face_box[1] + face_box[3]) / 2.0]
     if polar:
         target_size = np.array(target_size)
@@ -36,11 +36,11 @@ def warp_image(image, face_box, target_size, polar,
             (target_size[0], 1)).transpose()
 
     return cv2.remap(image, src_x_indices.astype(np.float32), src_y_indices.astype(np.float32),
-                     interpolation, borderMode=border_mode)
+                     interpolation, borderMode=border_mode, borderValue=border_value)
 
 
-def restore_image(warped_image, face_box, image_size, polar,
-                  interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_CONSTANT):
+def restore_image(warped_image, face_box, image_size, polar, interpolation=cv2.INTER_LINEAR,
+                  border_mode=cv2.BORDER_CONSTANT, border_value=0):
     warped_size = warped_image.shape[1::-1]
     face_center = [(face_box[0] + face_box[2]) / 2.0, (face_box[1] + face_box[3]) / 2.0]
 
@@ -71,7 +71,7 @@ def restore_image(warped_image, face_box, image_size, polar,
             (image_size[0], 1)).transpose()
 
     return cv2.remap(warped_image, src_x_indices.astype(np.float32), src_y_indices.astype(np.float32),
-                     interpolation, borderMode=border_mode)
+                     interpolation, borderMode=border_mode, borderValue=border_value)
 
 
 def main():
