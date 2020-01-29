@@ -7,7 +7,7 @@ from saic_vision.object_detector import S3FMobileV2Detector
 
 
 def warp_image(image, face_box, target_size, polar,
-               interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_DEFAULT):
+               interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_CONSTANT):
     face_center = [(face_box[0] + face_box[2]) / 2.0, (face_box[1] + face_box[3]) / 2.0]
     if polar:
         target_size = np.array(target_size)
@@ -40,7 +40,7 @@ def warp_image(image, face_box, target_size, polar,
 
 
 def restore_image(warped_image, face_box, image_size, polar,
-                  interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_DEFAULT):
+                  interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_CONSTANT):
     warped_size = warped_image.shape[1::-1]
     face_center = [(face_box[0] + face_box[2]) / 2.0, (face_box[1] + face_box[3]) / 2.0]
 
