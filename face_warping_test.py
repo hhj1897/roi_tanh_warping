@@ -9,16 +9,24 @@ from saic_vision.object_detector import S3FMobileV2Detector
 def warp_image(image, face_box, target_size, polar, interpolation=cv2.INTER_LINEAR,
                border_mode=cv2.BORDER_CONSTANT, border_value=0):
     face_center = [(face_box[0] + face_box[2]) / 2.0, (face_box[1] + face_box[3]) / 2.0]
-    if polar:
+    if polar > 0:
         target_size = np.array(target_size)
         face_radii = [(face_box[2] - face_box[0]) / np.pi ** 0.5, (face_box[3] - face_box[1]) / np.pi ** 0.5]
 
-        dest_indices = np.stack(np.meshgrid(np.arange(target_size[0]), np.arange(target_size[1])),
-                                axis=-1).astype(float)
-        normalised_dest_indices = (dest_indices + 0.5 - target_size / 2.0) / target_size * 2.0
-        radii = np.linalg.norm(normalised_dest_indices, axis=-1)
-        orientation_x = normalised_dest_indices[..., 0] / np.clip(radii, 1e-9, None)
-        orientation_y = normalised_dest_indices[..., 1] / np.clip(radii, 1e-9, None)
+        if polar > 1:
+            normalised_dest_indices = np.stack(np.meshgrid(np.arange(0.0, 1.0, 1.0 / target_size[0]),
+                                                           np.arange(-np.pi, np.pi, 2.0 * np.pi / target_size[1])),
+                                               axis=-1)
+            radii = normalised_dest_indices[..., 0]
+            orientation_x = np.cos(normalised_dest_indices[..., 1])
+            orientation_y = np.sin(normalised_dest_indices[..., 1])
+        else:
+            dest_indices = np.stack(np.meshgrid(np.arange(target_size[0]), np.arange(target_size[1])),
+                                    axis=-1).astype(float)
+            normalised_dest_indices = (dest_indices + 0.5 - target_size / 2.0) / target_size * 2.0
+            radii = np.linalg.norm(normalised_dest_indices, axis=-1)
+            orientation_x = normalised_dest_indices[..., 0] / np.clip(radii, 1e-9, None)
+            orientation_y = normalised_dest_indices[..., 1] / np.clip(radii, 1e-9, None)
 
         src_radii = np.arctanh(np.clip(radii, None, 1.0 - 1e-9))
         src_x_indices = face_center[0] + face_radii[0] * src_radii * orientation_x
@@ -44,7 +52,7 @@ def restore_image(warped_image, face_box, image_size, polar, interpolation=cv2.I
     warped_size = warped_image.shape[1::-1]
     face_center = [(face_box[0] + face_box[2]) / 2.0, (face_box[1] + face_box[3]) / 2.0]
 
-    if polar:
+    if polar > 0:
         face_radii = np.array([(face_box[2] - face_box[0]) / np.pi ** 0.5,
                                (face_box[3] - face_box[1]) / np.pi ** 0.5])
 
@@ -52,12 +60,18 @@ def restore_image(warped_image, face_box, image_size, polar, interpolation=cv2.I
                                 axis=-1).astype(float)
         normalised_dest_indices = (dest_indices - np.array(face_center)) / face_radii
         radii = np.linalg.norm(normalised_dest_indices, axis=-1)
-        orientation_x = normalised_dest_indices[..., 0] / np.clip(radii, 1e-9, None)
-        orientation_y = normalised_dest_indices[..., 1] / np.clip(radii, 1e-9, None)
 
         src_radii = np.tanh(radii)
-        src_x_indices = (orientation_x * src_radii + 1.0) * warped_size[0] / 2.0 - 0.5
-        src_y_indices = (orientation_y * src_radii + 1.0) * warped_size[1] / 2.0 - 0.5
+        if polar > 1:
+            src_x_indices = src_radii * warped_size[0]
+            src_y_indices = (np.arctan2(normalised_dest_indices[..., 1],
+                                        normalised_dest_indices[..., 0]) / 2.0 / np.pi + 0.5) * warped_size[1]
+        else:
+            orientation_x = normalised_dest_indices[..., 0] / np.clip(radii, 1e-9, None)
+            orientation_y = normalised_dest_indices[..., 1] / np.clip(radii, 1e-9, None)
+
+            src_x_indices = (orientation_x * src_radii + 1.0) * warped_size[0] / 2.0 - 0.5
+            src_y_indices = (orientation_y * src_radii + 1.0) * warped_size[1] / 2.0 - 0.5
     else:
         half_face_size = [(face_box[2] - face_box[0]) / 2.0, (face_box[3] - face_box[1]) / 2.0]
 
@@ -79,7 +93,7 @@ def main():
     parser.add_argument('-v', '--video', help='video source')
     parser.add_argument('-x', '--width', help='face width', type=int, default=256)
     parser.add_argument('-y', '--height', help='face height', type=int, default=256)
-    parser.add_argument('-p', '--polar', help='use polar coordinates', action='store_true')
+    parser.add_argument('-p', '--polar', help='use polar coordinates', type=int, default=0)
     parser.add_argument('-r', '--restore', help='show restored frames', action='store_true')
     args = parser.parse_args()
 
@@ -130,7 +144,7 @@ def main():
                             border_colour = (0, 0, 255)
                         else:
                             border_colour = (128, 128, 128)
-                        cv2.rectangle(frame, (bbox[0], bbox[1]), (bbox[2], bbox[3]),
+                        cv2.rectangle(frame, (int(bbox[0]), int(bbox[1])), (int(bbox[2]), int(bbox[3])),
                                       color=border_colour, thickness=2)
                 else:
                     warped_frame = None
