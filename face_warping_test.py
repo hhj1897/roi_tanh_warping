@@ -4,88 +4,7 @@ import torch
 import numpy as np
 from argparse import ArgumentParser
 from saic_vision.object_detector import S3FMobileV2Detector
-
-
-def warp_image(image, face_box, target_size, polar, interpolation=cv2.INTER_LINEAR,
-               border_mode=cv2.BORDER_CONSTANT, border_value=0):
-    face_center = [(face_box[0] + face_box[2]) / 2.0, (face_box[1] + face_box[3]) / 2.0]
-    if polar > 0:
-        target_size = np.array(target_size)
-        face_radii = [(face_box[2] - face_box[0]) / np.pi ** 0.5, (face_box[3] - face_box[1]) / np.pi ** 0.5]
-
-        if polar > 1:
-            normalised_dest_indices = np.stack(np.meshgrid(np.arange(0.0, 1.0, 1.0 / target_size[0]),
-                                                           np.arange(-np.pi, np.pi, 2.0 * np.pi / target_size[1])),
-                                               axis=-1)
-            radii = normalised_dest_indices[..., 0]
-            orientation_x = np.cos(normalised_dest_indices[..., 1])
-            orientation_y = np.sin(normalised_dest_indices[..., 1])
-        else:
-            dest_indices = np.stack(np.meshgrid(np.arange(target_size[0]), np.arange(target_size[1])),
-                                    axis=-1).astype(float)
-            normalised_dest_indices = (dest_indices + 0.5 - target_size / 2.0) / target_size * 2.0
-            radii = np.linalg.norm(normalised_dest_indices, axis=-1)
-            orientation_x = normalised_dest_indices[..., 0] / np.clip(radii, 1e-9, None)
-            orientation_y = normalised_dest_indices[..., 1] / np.clip(radii, 1e-9, None)
-
-        src_radii = np.arctanh(np.clip(radii, None, 1.0 - 1e-9))
-        src_x_indices = face_center[0] + face_radii[0] * src_radii * orientation_x
-        src_y_indices = face_center[1] + face_radii[1] * src_radii * orientation_y
-    else:
-        half_face_size = [(face_box[2] - face_box[0]) / 2.0, (face_box[3] - face_box[1]) / 2.0]
-
-        src_x_indices = np.tile(
-            face_center[0] + half_face_size[0] * np.arctanh(
-                (np.arange(target_size[0]) - target_size[0] / 2.0 + 0.5) / target_size[0] * 2.0),
-            (target_size[1], 1))
-        src_y_indices = np.tile(
-            face_center[1] + half_face_size[1] * np.arctanh(
-                (np.arange(target_size[1]) - target_size[1] / 2.0 + 0.5) / target_size[1] * 2.0),
-            (target_size[0], 1)).transpose()
-
-    return cv2.remap(image, src_x_indices.astype(np.float32), src_y_indices.astype(np.float32),
-                     interpolation, borderMode=border_mode, borderValue=border_value)
-
-
-def restore_image(warped_image, face_box, image_size, polar, interpolation=cv2.INTER_LINEAR,
-                  border_mode=cv2.BORDER_CONSTANT, border_value=0):
-    warped_size = warped_image.shape[1::-1]
-    face_center = [(face_box[0] + face_box[2]) / 2.0, (face_box[1] + face_box[3]) / 2.0]
-
-    if polar > 0:
-        face_radii = np.array([(face_box[2] - face_box[0]) / np.pi ** 0.5,
-                               (face_box[3] - face_box[1]) / np.pi ** 0.5])
-
-        dest_indices = np.stack(np.meshgrid(np.arange(image_size[0]), np.arange(image_size[1])),
-                                axis=-1).astype(float)
-        normalised_dest_indices = (dest_indices - np.array(face_center)) / face_radii
-        radii = np.linalg.norm(normalised_dest_indices, axis=-1)
-
-        src_radii = np.tanh(radii)
-        if polar > 1:
-            src_x_indices = src_radii * warped_size[0]
-            src_y_indices = (np.arctan2(normalised_dest_indices[..., 1],
-                                        normalised_dest_indices[..., 0]) / 2.0 / np.pi + 0.5) * warped_size[1]
-        else:
-            orientation_x = normalised_dest_indices[..., 0] / np.clip(radii, 1e-9, None)
-            orientation_y = normalised_dest_indices[..., 1] / np.clip(radii, 1e-9, None)
-
-            src_x_indices = (orientation_x * src_radii + 1.0) * warped_size[0] / 2.0 - 0.5
-            src_y_indices = (orientation_y * src_radii + 1.0) * warped_size[1] / 2.0 - 0.5
-    else:
-        half_face_size = [(face_box[2] - face_box[0]) / 2.0, (face_box[3] - face_box[1]) / 2.0]
-
-        src_x_indices = np.tile(
-            (np.tanh((np.arange(image_size[0]) - face_center[0]) /
-                     half_face_size[0]) + 1.0) / 2.0 * warped_size[0] - 0.5,
-            (image_size[1], 1))
-        src_y_indices = np.tile(
-            (np.tanh((np.arange(image_size[1]) - face_center[1]) /
-                     half_face_size[1]) + 1.0) / 2.0 * warped_size[1] - 0.5,
-            (image_size[0], 1)).transpose()
-
-    return cv2.remap(warped_image, src_x_indices.astype(np.float32), src_y_indices.astype(np.float32),
-                     interpolation, borderMode=border_mode, borderValue=border_value)
+from roi_tanh_warping import *
 
 
 def main():
@@ -130,11 +49,31 @@ def main():
                                                       for bbox in face_boxes]))
 
                     # Warping
-                    warped_frame = warp_image(frame, face_boxes[biggest_face_idx], (args.width, args.height),
-                                              args.polar, border_mode=cv2.BORDER_REPLICATE)
+                    if args.polar > 1:
+                        warped_frame = roi_tanh_circular_warp(frame, face_boxes[biggest_face_idx],
+                                                              (args.width, args.height),
+                                                              border_mode=cv2.BORDER_REPLICATE)
+                    elif args.polar > 0:
+                        warped_frame = roi_tanh_polor_warp(frame, face_boxes[biggest_face_idx],
+                                                           (args.width, args.height),
+                                                           border_mode=cv2.BORDER_REPLICATE)
+                    else:
+                        warped_frame = roi_tanh_warp(frame, face_boxes[biggest_face_idx],
+                                                     (args.width, args.height), border_mode=cv2.BORDER_REPLICATE)
+
+                    # Restoration
                     if args.restore:
-                        restored_frame = restore_image(warped_frame, face_boxes[biggest_face_idx], frame.shape[1::-1],
-                                                       args.polar, border_mode=cv2.BORDER_REPLICATE)
+                        if args.polar > 1:
+                            restored_frame = roi_tanh_circular_restore(warped_frame, face_boxes[biggest_face_idx],
+                                                                       frame.shape[1::-1],
+                                                                       border_mode=cv2.BORDER_REPLICATE)
+                        elif args.polar > 0:
+                            restored_frame = roi_tanh_polar_restore(warped_frame, face_boxes[biggest_face_idx],
+                                                                    frame.shape[1::-1],
+                                                                    border_mode=cv2.BORDER_REPLICATE)
+                        else:
+                            restored_frame = roi_tanh_restore(warped_frame, face_boxes[biggest_face_idx],
+                                                              frame.shape[1::-1], border_mode=cv2.BORDER_REPLICATE)
                     else:
                         restored_frame = None
 
