@@ -68,7 +68,6 @@ def roi_tanh_polar_restore(warped_image, roi, image_size, interpolation=cv2.INTE
                            border_mode=cv2.BORDER_CONSTANT, border_value=0):
     warped_size = warped_image.shape[1::-1]
     roi_center = [(roi[0] + roi[2]) / 2.0, (roi[1] + roi[3]) / 2.0]
-
     roi_radii = np.array([(roi[2] - roi[0]) / np.pi ** 0.5, (roi[3] - roi[1]) / np.pi ** 0.5])
 
     dest_indices = np.stack(np.meshgrid(np.arange(image_size[0]), np.arange(image_size[1])),
@@ -103,7 +102,6 @@ def roi_tanh_circular_warp(image, roi, target_size, interpolation=cv2.INTER_LINE
 
     return cv2.remap(image, src_x_indices.astype(np.float32), src_y_indices.astype(np.float32),
                      interpolation, borderMode=border_mode, borderValue=border_value)
-    pass
 
 
 def roi_tanh_circular_restore(warped_image, roi, image_size, interpolation=cv2.INTER_LINEAR,
