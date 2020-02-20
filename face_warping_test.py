@@ -14,6 +14,7 @@ def main():
     parser.add_argument('-y', '--height', help='face height', type=int, default=256)
     parser.add_argument('-p', '--polar', help='use polar coordinates', type=int, default=0)
     parser.add_argument('-r', '--restore', help='show restored frames', action='store_true')
+    parser.add_argument('-o', '--offset', help='angular offset, only used when polar=1', type=float, default=0.0)
     args = parser.parse_args()
 
     # Make the models run a bit faster
@@ -56,6 +57,7 @@ def main():
                     elif args.polar > 0:
                         warped_frame = roi_tanh_polor_warp(frame, face_boxes[biggest_face_idx],
                                                            (args.width, args.height),
+                                                           angular_offset=args.offset * np.pi,
                                                            border_mode=cv2.BORDER_REPLICATE)
                     else:
                         warped_frame = roi_tanh_warp(frame, face_boxes[biggest_face_idx],
@@ -70,6 +72,7 @@ def main():
                         elif args.polar > 0:
                             restored_frame = roi_tanh_polar_restore(warped_frame, face_boxes[biggest_face_idx],
                                                                     frame.shape[1::-1],
+                                                                    angular_offset=args.offset * np.pi,
                                                                     border_mode=cv2.BORDER_REPLICATE)
                         else:
                             restored_frame = roi_tanh_restore(warped_frame, face_boxes[biggest_face_idx],

@@ -44,14 +44,15 @@ def roi_tanh_restore(warped_image, roi, image_size, interpolation=cv2.INTER_LINE
                      interpolation, borderMode=border_mode, borderValue=border_value)
 
 
-def roi_tanh_polor_warp(image, roi, target_size, interpolation=cv2.INTER_LINEAR,
+def roi_tanh_polor_warp(image, roi, target_size, angular_offset=0.0, interpolation=cv2.INTER_LINEAR,
                         border_mode=cv2.BORDER_CONSTANT, border_value=0):
     roi_center = [(roi[0] + roi[2]) / 2.0, (roi[1] + roi[3]) / 2.0]
     target_size = np.array(target_size)
     roi_radii = [(roi[2] - roi[0]) / np.pi ** 0.5, (roi[3] - roi[1]) / np.pi ** 0.5]
 
     normalised_dest_indices = np.stack(np.meshgrid(np.arange(0.0, 1.0, 1.0 / target_size[0]),
-                                                   np.arange(-np.pi, np.pi, 2.0 * np.pi / target_size[1])), axis=-1)
+                                                   np.arange(0.0, 2.0 * np.pi, 2.0 * np.pi / target_size[1]) +
+                                                   angular_offset), axis=-1)
     radii = normalised_dest_indices[..., 0]
     orientation_x = np.cos(normalised_dest_indices[..., 1])
     orientation_y = np.sin(normalised_dest_indices[..., 1])
@@ -64,7 +65,7 @@ def roi_tanh_polor_warp(image, roi, target_size, interpolation=cv2.INTER_LINEAR,
                      interpolation, borderMode=border_mode, borderValue=border_value)
 
 
-def roi_tanh_polar_restore(warped_image, roi, image_size, interpolation=cv2.INTER_LINEAR,
+def roi_tanh_polar_restore(warped_image, roi, image_size, angular_offset=0.0, interpolation=cv2.INTER_LINEAR,
                            border_mode=cv2.BORDER_CONSTANT, border_value=0):
     warped_size = warped_image.shape[1::-1]
     roi_center = [(roi[0] + roi[2]) / 2.0, (roi[1] + roi[3]) / 2.0]
@@ -77,8 +78,8 @@ def roi_tanh_polar_restore(warped_image, roi, image_size, interpolation=cv2.INTE
 
     src_radii = np.tanh(radii)
     src_x_indices = src_radii * warped_size[0]
-    src_y_indices = (np.arctan2(normalised_dest_indices[..., 1],
-                                normalised_dest_indices[..., 0]) / 2.0 / np.pi + 0.5) * warped_size[1]
+    src_y_indices = ((np.arctan2(normalised_dest_indices[..., 1], normalised_dest_indices[..., 0]) -
+                      angular_offset) / 2.0 / np.pi) * warped_size[1] % warped_size[1]
 
     return cv2.remap(warped_image, src_x_indices.astype(np.float32), src_y_indices.astype(np.float32),
                      interpolation, borderMode=border_mode, borderValue=border_value)
