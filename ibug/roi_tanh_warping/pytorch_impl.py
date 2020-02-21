@@ -115,7 +115,7 @@ def roi_tanh_circular_warp(images: torch.Tensor, rois: torch.Tensor, target_size
     radii = normalised_dest_indices.norm(dim=-1)
     orientation_x = normalised_dest_indices[..., 0] / radii.clamp(min=1e-9)
     orientation_y = normalised_dest_indices[..., 1] / radii.clamp(min=1e-9)
-    warped_radii = arctanh(radii)
+    warped_radii = arctanh(radii.clamp(max=1.0 - 1e-9))
     warped_x_indices = warped_radii * orientation_x
     warped_y_indices = warped_radii * orientation_y
     for roi_center, roi_radii, grid in zip(roi_centers, rois_radii, grids):

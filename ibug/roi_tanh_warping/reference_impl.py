@@ -92,7 +92,7 @@ def roi_tanh_circular_warp(image, roi, target_size, interpolation=cv2.INTER_LINE
     orientation_x = normalised_dest_indices[..., 0] / np.clip(radii, 1e-9, None)
     orientation_y = normalised_dest_indices[..., 1] / np.clip(radii, 1e-9, None)
 
-    src_radii = np.arctanh(radii)
+    src_radii = np.arctanh(np.clip(radii, None, 1.0 - 1e-9))
     src_x_indices = roi_center[0] + roi_radii[0] * src_radii * orientation_x
     src_y_indices = roi_center[1] + roi_radii[1] * src_radii * orientation_y
 
