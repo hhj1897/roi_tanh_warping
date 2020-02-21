@@ -5,8 +5,8 @@ import numpy as np
 from argparse import ArgumentParser
 from saic_vision.object_detector import S3FMobileV2Detector
 
-from roi_tanh_warping import *
-from roi_tanh_warping import reference_impl as ref
+from ibug.roi_tanh_warping import *
+from ibug.roi_tanh_warping import reference_impl as ref
 
 
 def test_pytorch_impl(frame, face_box, target_size, polar, offset, restore):
@@ -16,11 +16,10 @@ def test_pytorch_impl(frame, face_box, target_size, polar, offset, restore):
 
     # Warping
     if polar > 1:
-        warped_frames = None
-        pass
+        warped_frames = roi_tanh_circular_warp(frames, face_boxes, target_size, padding='border')
     elif polar > 0:
-        warped_frames = None
-        pass
+        warped_frames = roi_tanh_polar_warp(frames, face_boxes, target_size,
+                                            angular_offset=offset * np.pi, padding='border')
     else:
         warped_frames = roi_tanh_warp(frames, face_boxes, target_size, padding='border')
     warped_frame = warped_frames[0].detach().permute(1, 2, 0).cpu().numpy().astype(np.uint8)
@@ -28,11 +27,11 @@ def test_pytorch_impl(frame, face_box, target_size, polar, offset, restore):
     # Restoration
     if restore:
         if polar > 1:
-            restored_frames = None
-            pass
-        if polar > 0:
-            restored_frames = None
-            pass
+            restored_frames = roi_tanh_circular_restore(warped_frames, face_boxes, frames.size()[-2:],
+                                                        padding='border')
+        elif polar > 0:
+            restored_frames = roi_tanh_polar_restore(warped_frames, face_boxes, frames.size()[-2:],
+                                                     angular_offset=offset * np.pi, padding='border')
         else:
             restored_frames = roi_tanh_restore(warped_frames, face_boxes, frames.size()[-2:], padding='border')
         restored_frame = restored_frames[0].detach().permute(1, 2, 0).cpu().numpy().astype(np.uint8)
@@ -47,7 +46,7 @@ def test_reference_impl(frame, face_box, target_size, polar, offset, restore):
     if polar > 1:
         warped_frame = ref.roi_tanh_circular_warp(frame, face_box, target_size, border_mode=cv2.BORDER_REPLICATE)
     elif polar > 0:
-        warped_frame = ref.roi_tanh_polor_warp(frame, face_box, target_size, angular_offset=offset * np.pi,
+        warped_frame = ref.roi_tanh_polar_warp(frame, face_box, target_size, angular_offset=offset * np.pi,
                                                border_mode=cv2.BORDER_REPLICATE)
     else:
         warped_frame = ref.roi_tanh_warp(frame, face_box, target_size, border_mode=cv2.BORDER_REPLICATE)
@@ -76,8 +75,9 @@ def main():
     parser.add_argument('-x', '--width', help='face width', type=int, default=256)
     parser.add_argument('-y', '--height', help='face height', type=int, default=256)
     parser.add_argument('-p', '--polar', help='use polar coordinates', type=int, default=0)
-    parser.add_argument('-r', '--restore', help='show restored frames', action='store_true')
     parser.add_argument('-o', '--offset', help='angular offset, only used when polar=1', type=float, default=0.0)
+    parser.add_argument('-r', '--restore', help='show restored frames', action='store_true')
+    parser.add_argument('-c', '--compare', help='compare with reference implementation', action='store_true')
     args = parser.parse_args()
 
     # Make the models run a bit faster
@@ -112,17 +112,25 @@ def main():
                     biggest_face_idx = int(np.argmax([(bbox[3] - bbox[1]) * (bbox[2] - bbox[0])
                                                       for bbox in face_boxes]))
 
-                    # warped_frame, restored_frame = test_reference_impl(frame, face_boxes[biggest_face_idx],
-                    #                                                    (args.height, args.width),
-                    #                                                    args.polar, args.offset, args.restore)
-
                     warped_frame, restored_frame = test_pytorch_impl(frame, face_boxes[biggest_face_idx],
                                                                      (args.height, args.width),
                                                                      args.polar, args.offset, args.restore)
-
-                    lala = ((restored_frame.astype(int) - frame.astype(int) + 255) / 2).astype(np.uint8)
-
-                    cv2.imshow('lala', lala)
+                    if args.compare:
+                        ref_warped_frame, ref_restored_frame = test_reference_impl(frame,
+                                                                                   face_boxes[biggest_face_idx],
+                                                                                   (args.height, args.width),
+                                                                                   args.polar, args.offset,
+                                                                                   args.restore)
+                        diff_warped_frame = np.abs(ref_warped_frame.astype(int) -
+                                                   warped_frame.astype(int)).astype(np.uint8)
+                        if args.restore:
+                            diff_restored_frame = np.abs(ref_restored_frame.astype(int) -
+                                                         restored_frame.astype(int)).astype(np.uint8)
+                        else:
+                            diff_restored_frame = None
+                    else:
+                        diff_warped_frame = None
+                        diff_restored_frame = None
 
                     # Rendering
                     for idx, bbox in enumerate(face_boxes):
@@ -135,10 +143,22 @@ def main():
                 else:
                     warped_frame = None
                     restored_frame = None
+                    diff_warped_frame = None
+                    diff_restored_frame = None
 
                 # Show the result
                 print('Frame #%d: %d faces(s) detected.' % (frame_number, len(face_boxes)))
                 cv2.imshow(script_name, frame)
+                if args.compare:
+                    if args.restore:
+                        if diff_restored_frame is None:
+                            cv2.destroyWindow('Restored (diff)')
+                        else:
+                            cv2.imshow('Restored (diff)', diff_restored_frame)
+                    if diff_warped_frame is None:
+                        cv2.destroyWindow('Warped (diff)')
+                    else:
+                        cv2.imshow('Warped (diff)', diff_warped_frame)
                 if args.restore:
                     if restored_frame is None:
                         cv2.destroyWindow('Restored')
