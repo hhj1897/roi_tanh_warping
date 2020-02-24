@@ -72,9 +72,11 @@ def roi_tanh_polar_restore(warped_image, roi, image_size, angular_offset=0.0,
     radii = np.linalg.norm(normalised_dest_indices, axis=-1)
 
     src_radii = np.tanh(radii)
-    src_x_indices = src_radii * warped_width
+    warped_image = np.pad(np.pad(warped_image, [(1, 1), (0, 0)] + [(0, 0)] * (warped_image.ndim - 2), mode='wrap'),
+                          [(0, 0), (1, 0)] + [(0, 0)] * (warped_image.ndim - 2), mode='edge')
+    src_x_indices = src_radii * warped_width + 1.0
     src_y_indices = np.mod(((np.arctan2(normalised_dest_indices[..., 1], normalised_dest_indices[..., 0]) -
-                             angular_offset) / 2.0 / np.pi) * warped_height, warped_height)
+                             angular_offset) / 2.0 / np.pi) * warped_height, warped_height) + 1.0
 
     return cv2.remap(warped_image, src_x_indices.astype(np.float32), src_y_indices.astype(np.float32),
                      interpolation, borderMode=border_mode, borderValue=border_value)
