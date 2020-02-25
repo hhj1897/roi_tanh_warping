@@ -12,7 +12,7 @@ from ibug.roi_tanh_warping import reference_impl as ref
 def test_pytorch_impl(frame, face_box, target_size, polar, offset, restore):
     # Data preparation
     frames = torch.from_numpy(frame.astype(np.float32)).to(torch.device('cuda:0')).permute(2, 0, 1).unsqueeze(0)
-    face_boxes = torch.Tensor(face_box[:4]).to(frames.device).unsqueeze(0)
+    face_boxes = torch.from_numpy(np.array(face_box[:4], dtype=np.float32)).to(frames.device).unsqueeze(0)
 
     # Warping
     if polar > 1:
@@ -21,7 +21,7 @@ def test_pytorch_impl(frame, face_box, target_size, polar, offset, restore):
     elif polar > 0:
         warped_frames = roi_tanh_polar_warp(frames, face_boxes, target_size, angular_offsets=offset, padding='border')
     else:
-        warped_frames = roi_tanh_warp(frames, face_boxes, target_size, angular_offset=offset, padding='border')
+        warped_frames = roi_tanh_warp(frames, face_boxes, target_size, angular_offsets=offset, padding='border')
     warped_frame = warped_frames[0].detach().permute(1, 2, 0).cpu().numpy().astype(np.uint8)
 
     # Restoration
@@ -34,7 +34,7 @@ def test_pytorch_impl(frame, face_box, target_size, polar, offset, restore):
                                                      angular_offsets=offset, padding='border')
         else:
             restored_frames = roi_tanh_restore(warped_frames, face_boxes, frames.size()[-2:],
-                                               angular_offset=offset, padding='border')
+                                               angular_offsets=offset, padding='border')
         restored_frame = restored_frames[0].detach().permute(1, 2, 0).cpu().numpy().astype(np.uint8)
     else:
         restored_frame = None
