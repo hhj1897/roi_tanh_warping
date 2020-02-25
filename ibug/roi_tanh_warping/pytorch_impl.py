@@ -4,13 +4,27 @@ import torch.nn.functional as tf
 from typing import Tuple, Union
 
 
-__all__ = ['roi_tanh_warp', 'roi_tanh_restore',
+__all__ = ['make_square_rois',
+           'roi_tanh_warp', 'roi_tanh_restore',
            'roi_tanh_polar_warp', 'roi_tanh_polar_restore',
            'roi_tanh_circular_warp', 'roi_tanh_circular_restore']
 
 
 def arctanh(x: torch.Tensor) -> torch.Tensor:
     return torch.log((1.0 + x) / (1.0 - x).clamp(1e-9)) / 2.0
+
+
+def make_square_rois(rois: torch.Tensor, opt=0) -> torch.Tensor:
+    roi_sizes = (rois[..., 2:4] - rois[..., :2])
+    if opt < 0:
+        target_sizes = roi_sizes.min(dim=-1)[0]
+    elif opt > 0:
+        target_sizes = roi_sizes.max(dim=-1)[0]
+    else:
+        target_sizes = (roi_sizes[..., 0] * roi_sizes[..., 1]) ** 0.5
+    deltas = (roi_sizes - target_sizes) / 2.0
+    deltas = torch.cat((deltas, -deltas), -1)
+    return rois + deltas
 
 
 def roi_tanh_warp(images: torch.Tensor, rois: torch.Tensor, target_size: Tuple[int, int],

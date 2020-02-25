@@ -1,13 +1,28 @@
 import cv2
 import numpy as np
+from typing import List, Tuple
 
 
-__all__ = ['roi_tanh_warp', 'roi_tanh_restore',
+__all__ = ['make_square_rois',
+           'roi_tanh_warp', 'roi_tanh_restore',
            'roi_tanh_polar_warp', 'roi_tanh_polar_restore',
            'roi_tanh_circular_warp', 'roi_tanh_circular_restore']
 
 
-def roi_tanh_warp(image, roi, target_size, angular_offset: float = 0.0,
+def make_square_rois(rois: np.ndarray, opt=0) -> np.ndarray:
+    roi_sizes = (rois[..., 2:4] - rois[..., :2])
+    if opt < 0:
+        target_sizes = roi_sizes.min(axis=-1)
+    elif opt > 0:
+        target_sizes = roi_sizes.max(axis=-1)
+    else:
+        target_sizes = (roi_sizes[..., 0] * roi_sizes[..., 1]) ** 0.5
+    deltas = (roi_sizes - target_sizes) / 2.0
+    deltas = np.hstack((deltas, -deltas))
+    return rois + deltas
+
+
+def roi_tanh_warp(image: np.ndarray, roi: List, target_size: Tuple[int, int], angular_offset: float = 0.0,
                   interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_CONSTANT, border_value=0):
     roi_center = [(roi[0] + roi[2]) / 2.0, (roi[1] + roi[3]) / 2.0]
     half_roi_size = [(roi[2] - roi[0]) / 2.0, (roi[3] - roi[1]) / 2.0]
@@ -25,7 +40,7 @@ def roi_tanh_warp(image, roi, target_size, angular_offset: float = 0.0,
                      interpolation, borderMode=border_mode, borderValue=border_value)
 
 
-def roi_tanh_restore(warped_image, roi, image_size, angular_offset: float = 0.0,
+def roi_tanh_restore(warped_image: np.ndarray, roi: List, image_size: Tuple[int, int], angular_offset: float = 0.0,
                      interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_CONSTANT, border_value=0):
     roi_center = [(roi[0] + roi[2]) / 2.0, (roi[1] + roi[3]) / 2.0]
     half_roi_size = [(roi[2] - roi[0]) / 2.0, (roi[3] - roi[1]) / 2.0]
@@ -40,7 +55,7 @@ def roi_tanh_restore(warped_image, roi, image_size, angular_offset: float = 0.0,
                      interpolation, borderMode=border_mode, borderValue=border_value)
 
 
-def roi_tanh_polar_warp(image, roi, target_size, angular_offset=0.0,
+def roi_tanh_polar_warp(image: np.ndarray, roi: List, target_size: Tuple[int, int], angular_offset: float = 0.0,
                         interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_CONSTANT, border_value=0):
     roi_center = [(roi[0] + roi[2]) / 2.0, (roi[1] + roi[3]) / 2.0]
     roi_radii = [(roi[2] - roi[0]) / np.pi ** 0.5, (roi[3] - roi[1]) / np.pi ** 0.5]
@@ -63,7 +78,7 @@ def roi_tanh_polar_warp(image, roi, target_size, angular_offset=0.0,
                      interpolation, borderMode=border_mode, borderValue=border_value)
 
 
-def roi_tanh_polar_restore(warped_image, roi, image_size, angular_offset=0.0,
+def roi_tanh_polar_restore(warped_image: np.ndarray, roi: List, image_size: Tuple[int, int], angular_offset=0.0,
                            interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_CONSTANT, border_value=0):
     warped_height, warped_width = warped_image.shape[:2]
     roi_center = np.array([(roi[0] + roi[2]) / 2.0, (roi[1] + roi[3]) / 2.0])
@@ -86,7 +101,7 @@ def roi_tanh_polar_restore(warped_image, roi, image_size, angular_offset=0.0,
                      interpolation, borderMode=border_mode, borderValue=border_value)
 
 
-def roi_tanh_circular_warp(image, roi, target_size, angular_offset: float = 0.0,
+def roi_tanh_circular_warp(image: np.ndarray, roi: List, target_size: Tuple[int, int], angular_offset: float = 0.0,
                            interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_CONSTANT, border_value=0):
     roi_center = [(roi[0] + roi[2]) / 2.0, (roi[1] + roi[3]) / 2.0]
     roi_radii = [(roi[2] - roi[0]) / np.pi ** 0.5, (roi[3] - roi[1]) / np.pi ** 0.5]
@@ -109,7 +124,7 @@ def roi_tanh_circular_warp(image, roi, target_size, angular_offset: float = 0.0,
                      interpolation, borderMode=border_mode, borderValue=border_value)
 
 
-def roi_tanh_circular_restore(warped_image, roi, image_size, angular_offset: float = 0.0,
+def roi_tanh_circular_restore(warped_image: np.ndarray, roi: List, image_size: Tuple[int, int], angular_offset=0.0,
                               interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_CONSTANT, border_value=0):
     warped_height, warped_width = warped_image.shape[:2]
     roi_center = np.array([(roi[0] + roi[2]) / 2.0, (roi[1] + roi[3]) / 2.0])
