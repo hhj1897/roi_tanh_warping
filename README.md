@@ -21,7 +21,7 @@ Command-line arguments:
 -p POLAR: Use tanh-polar warping (when set to 1) or 
           tanh-circular warping (when set to 2) instead of 
           normal tanh warping (when set to 0, default)
--o OFFSET: Angular offset (default=0), only used in tanh-polar warping
+-o OFFSET: Angular offset in degrees (default=0)
 -r: To also show restored frames
 -c: To also compare with OpenCV-based reference implementation 
 ```
