@@ -9,10 +9,12 @@ from ibug.roi_tanh_warping import *
 from ibug.roi_tanh_warping import reference_impl as ref
 
 
-def test_pytorch_impl(frame, face_box, target_size, polar, offset, restore):
-    # Data preparation
+def test_pytorch_impl(frame, face_box, target_size, polar, offset, restore, square):
+    # Preparation
     frames = torch.from_numpy(frame.astype(np.float32)).to(torch.device('cuda:0')).permute(2, 0, 1).unsqueeze(0)
-    face_boxes = torch.Tensor(face_box[:4]).to(frames.device).unsqueeze(0)
+    face_boxes = torch.from_numpy(np.array(face_box[:4], dtype=np.float32)).to(frames.device).unsqueeze(0)
+    if square:
+        face_boxes = make_square_rois(face_boxes)
 
     # Warping
     if polar > 1:
@@ -21,7 +23,7 @@ def test_pytorch_impl(frame, face_box, target_size, polar, offset, restore):
     elif polar > 0:
         warped_frames = roi_tanh_polar_warp(frames, face_boxes, target_size, angular_offsets=offset, padding='border')
     else:
-        warped_frames = roi_tanh_warp(frames, face_boxes, target_size, angular_offset=offset, padding='border')
+        warped_frames = roi_tanh_warp(frames, face_boxes, target_size, angular_offsets=offset, padding='border')
     warped_frame = warped_frames[0].detach().permute(1, 2, 0).cpu().numpy().astype(np.uint8)
 
     # Restoration
@@ -34,7 +36,7 @@ def test_pytorch_impl(frame, face_box, target_size, polar, offset, restore):
                                                      angular_offsets=offset, padding='border')
         else:
             restored_frames = roi_tanh_restore(warped_frames, face_boxes, frames.size()[-2:],
-                                               angular_offset=offset, padding='border')
+                                               angular_offsets=offset, padding='border')
         restored_frame = restored_frames[0].detach().permute(1, 2, 0).cpu().numpy().astype(np.uint8)
     else:
         restored_frame = None
@@ -42,7 +44,11 @@ def test_pytorch_impl(frame, face_box, target_size, polar, offset, restore):
     return warped_frame, restored_frame
 
 
-def test_reference_impl(frame, face_box, target_size, polar, offset, restore):
+def test_reference_impl(frame, face_box, target_size, polar, offset, restore, square):
+    # Preparation
+    if square:
+        face_box = ref.make_square_rois(np.array(face_box))
+
     # Warping
     if polar > 1:
         warped_frame = ref.roi_tanh_circular_warp(frame, face_box, target_size, angular_offset=offset,
@@ -80,6 +86,7 @@ def main():
     parser.add_argument('-o', '--offset', help='angular offset, only used when polar=1', type=float, default=0.0)
     parser.add_argument('-r', '--restore', help='show restored frames', action='store_true')
     parser.add_argument('-c', '--compare', help='compare with reference implementation', action='store_true')
+    parser.add_argument('-s', '--square', help='use square-shaped detection box', action='store_true')
     args = parser.parse_args()
 
     # Make the models run a bit faster
@@ -116,14 +123,15 @@ def main():
 
                     warped_frame, restored_frame = test_pytorch_impl(frame, face_boxes[biggest_face_idx],
                                                                      (args.height, args.width), args.polar,
-                                                                     args.offset / 180.0 * np.pi, args.restore)
+                                                                     args.offset / 180.0 * np.pi,
+                                                                     args.restore, args.square)
                     if args.compare:
                         ref_warped_frame, ref_restored_frame = test_reference_impl(frame,
                                                                                    face_boxes[biggest_face_idx],
                                                                                    (args.height, args.width),
                                                                                    args.polar,
                                                                                    args.offset / 180.0 * np.pi,
-                                                                                   args.restore)
+                                                                                   args.restore, args.square)
                         diff_warped_frame = np.abs(ref_warped_frame.astype(int) -
                                                    warped_frame.astype(int)).astype(np.uint8)
                         if args.restore:

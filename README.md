@@ -23,5 +23,6 @@ Command-line arguments:
           normal tanh warping (when set to 0, default)
 -o OFFSET: Angular offset in degrees (default=0)
 -r: To also show restored frames
--c: To also compare with OpenCV-based reference implementation 
+-c: To also compare with OpenCV-based reference implementation
+-s: To use square-shaped detection box
 ```
