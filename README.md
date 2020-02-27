@@ -25,4 +25,5 @@ Command-line arguments:
 -r: To also show restored frames
 -c: To also compare with OpenCV-based reference implementation
 -s: To use square-shaped detection box
+-n: To use nearest-neighbour interpolation during restoration
 ```

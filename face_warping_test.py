@@ -21,7 +21,7 @@ def test_pytorch_impl(frame, face_box, target_size, polar, offset, restore, squa
         warped_frames = roi_tanh_circular_warp(frames, face_boxes, target_size,
                                                angular_offsets=offset, padding='border')
     elif polar > 0:
-        warped_frames = roi_tanh_polar_warp(frames, face_boxes, target_size, angular_offsets=offset, padding='border', shears=3.14)
+        warped_frames = roi_tanh_polar_warp(frames, face_boxes, target_size, angular_offsets=offset, padding='border')
     else:
         warped_frames = roi_tanh_warp(frames, face_boxes, target_size, angular_offsets=offset, padding='border')
     warped_frame = warped_frames[0].detach().permute(1, 2, 0).cpu().numpy().astype(np.uint8)
@@ -36,7 +36,7 @@ def test_pytorch_impl(frame, face_box, target_size, polar, offset, restore, squa
         elif polar > 0:
             restored_frames = roi_tanh_polar_restore(warped_frames, face_boxes, frames.size()[-2:],
                                                      angular_offsets=offset, interpolation=interpolation,
-                                                     padding='border', shears=3.14)
+                                                     padding='border')
         else:
             restored_frames = roi_tanh_restore(warped_frames, face_boxes, frames.size()[-2:],
                                                angular_offsets=offset, interpolation=interpolation,
