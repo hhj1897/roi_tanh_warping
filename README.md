@@ -5,7 +5,7 @@ Differentiable implementation of some ROI-tanh warping methods.
 * pytorch
 * \[optional\] numpy
 * \[optional\] opencv-python
-* \[optional\]saic_vision.object_detector (or any face detector)
+* \[optional\] saic_vision.object_detector (or any face detector)
 
 ## How to Install
 `pip install -e .`
