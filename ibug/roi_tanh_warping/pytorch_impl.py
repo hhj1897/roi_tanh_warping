@@ -7,7 +7,8 @@ from typing import Tuple, Union
 __all__ = ['make_square_rois',
            'roi_tanh_warp', 'roi_tanh_restore',
            'roi_tanh_polar_warp', 'roi_tanh_polar_restore',
-           'roi_tanh_circular_warp', 'roi_tanh_circular_restore']
+           'roi_tanh_circular_warp', 'roi_tanh_circular_restore', 
+           'get_warp_func', 'get_restore_func']
 
 
 def arctanh(x: torch.Tensor) -> torch.Tensor:
@@ -233,3 +234,19 @@ def roi_tanh_circular_restore(warped_images: torch.Tensor, rois: torch.Tensor, i
                         0.5) / (warped_height - 1.0) * 2.0 - 1.0
 
     return tf.grid_sample(warped_images, grids, mode=interpolation, padding_mode=padding, align_corners=True)
+
+def get_warp_func(polar: int):
+    if polar == 0:
+        return roi_tanh_warp
+    elif polar == 1:
+        return roi_tanh_circular_warp
+    else:
+        return roi_tanh_polar_warp
+
+def get_restore_func(polar: int):
+    if polar == 0:
+        return roi_tanh_restore
+    elif polar == 1:
+        return roi_tanh_circular_restore
+    else:
+        return roi_tanh_polar_restore

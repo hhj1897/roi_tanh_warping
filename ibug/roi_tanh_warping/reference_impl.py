@@ -6,7 +6,8 @@ from typing import List, Tuple
 __all__ = ['make_square_rois',
            'roi_tanh_warp', 'roi_tanh_restore',
            'roi_tanh_polar_warp', 'roi_tanh_polar_restore',
-           'roi_tanh_circular_warp', 'roi_tanh_circular_restore']
+           'roi_tanh_circular_warp', 'roi_tanh_circular_restore', 
+           'get_warp_func', 'get_restore_func']
 
 
 def make_square_rois(rois: np.ndarray, opt=0) -> np.ndarray:
@@ -145,3 +146,19 @@ def roi_tanh_circular_restore(warped_image: np.ndarray, roi: List, image_size: T
 
     return cv2.remap(warped_image, src_x_indices.astype(np.float32), src_y_indices.astype(np.float32),
                      interpolation, borderMode=border_mode, borderValue=border_value)
+
+def get_warp_func(polar: int):
+    if polar == 0:
+        return roi_tanh_warp
+    elif polar == 1:
+        return roi_tanh_circular_warp
+    else:
+        return roi_tanh_polar_warp
+
+def get_restore_func(polar: int):
+    if polar == 0:
+        return roi_tanh_restore
+    elif polar == 1:
+        return roi_tanh_circular_restore
+    else:
+        return roi_tanh_polar_restore
