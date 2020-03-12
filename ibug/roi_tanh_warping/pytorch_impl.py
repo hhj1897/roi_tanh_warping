@@ -101,7 +101,8 @@ def roi_tanh_polar_warp(images: torch.Tensor, rois: torch.Tensor, target_size: T
     grids = torch.zeros(images.size()[:1] + target_size + (2,), dtype=images.dtype, device=images.device)
     wapred_radii = arctanh(torch.arange(0.0, 1.0, 1.0 / target_size[1], dtype=grids.dtype,
                                         device=grids.device)).unsqueeze(0).expand(target_size)
-    thetas = torch.arange(0.0, 2.0 * math.pi, 2.0 * math.pi / target_size[0], dtype=grids.dtype, device=grids.device)
+    thetas = torch.arange(0.0, 2.0 * math.pi, 2.0 * math.pi / target_size[0], dtype=grids.dtype,
+                          device=grids.device).unsqueeze(-1).expand(target_size)
 
     if torch.is_tensor(angular_offsets):
         cos_offsets, sin_offsets = angular_offsets.cos(), angular_offsets.sin()
@@ -111,8 +112,8 @@ def roi_tanh_polar_warp(images: torch.Tensor, rois: torch.Tensor, target_size: T
 
     for roi_center, roi_radii, grid, cos_offset, sin_offset in zip(roi_centers, rois_radii, grids,
                                                                    cos_offsets, sin_offsets):
-        warped_x_indices = roi_radii[0] * wapred_radii * torch.cos(thetas).unsqueeze(-1).expand(target_size)
-        warped_y_indices = roi_radii[1] * wapred_radii * torch.sin(thetas).unsqueeze(-1).expand(target_size)
+        warped_x_indices = roi_radii[0] * wapred_radii * torch.cos(thetas)
+        warped_y_indices = roi_radii[1] * wapred_radii * torch.sin(thetas)
         src_x_indices, src_y_indices = (cos_offset * warped_x_indices - sin_offset * warped_y_indices,
                                         cos_offset * warped_y_indices + sin_offset * warped_x_indices)
         grid[..., 0] = (roi_center[0] + src_x_indices) / (image_width - 1.0) * 2.0 - 1.0
@@ -150,9 +151,9 @@ def roi_tanh_polar_restore(warped_images: torch.Tensor, rois: torch.Tensor, imag
             cos_offset * normalised_dest_indices[..., 1] - sin_offset * normalised_dest_indices[..., 0])
         normalised_dest_indices /= roi_radii
         radii = normalised_dest_indices.norm(dim=-1)
+        thetas = torch.atan2(normalised_dest_indices[..., 1], normalised_dest_indices[..., 0])
         grid[..., 0] = (torch.tanh(radii) * 2.0 * warped_width + 2) / warped_width - 1.0
-        grid[..., 1] = ((torch.atan2(normalised_dest_indices[..., 1], normalised_dest_indices[..., 0]) /
-                         math.pi).remainder(2.0) * warped_height + 2) / (warped_height + 1.0) - 1.0
+        grid[..., 1] = ((thetas / math.pi).remainder(2.0) * warped_height + 2) / (warped_height + 1.0) - 1.0
 
     return tf.grid_sample(warped_images, grids, mode=interpolation, padding_mode=padding, align_corners=True)
 
