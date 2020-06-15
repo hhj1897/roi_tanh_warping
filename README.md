@@ -11,7 +11,7 @@ Differentiable implementation of some ROI-tanh warping methods.
 `pip install -e .`
 
 ## How to Test
-`python face_warping_test.py -v 0 -p 1 -r`
+`python face_warping_test.py -v 0 -p 1 -r -t`
 
 Command-line arguments:
 ```
@@ -26,4 +26,5 @@ Command-line arguments:
 -c: To also compare with OpenCV-based reference implementation
 -s: To use square-shaped detection box
 -n: To use nearest-neighbour interpolation during restoration
+-t: No strecthing in tanh-polar or tanh-circular warping
 ```
