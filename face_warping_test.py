@@ -9,7 +9,7 @@ from ibug.roi_tanh_warping import *
 from ibug.roi_tanh_warping import reference_impl as ref
 
 
-def test_pytorch_impl(frame, face_box, target_size, polar, offset, restore, square, nearest, no_stretching):
+def test_pytorch_impl(frame, face_box, target_size, polar, offset, restore, square, nearest, keep_aspect_ratio):
     # Preparation
     frames = torch.from_numpy(frame.astype(np.float32)).to(torch.device('cuda:0')).permute(2, 0, 1).unsqueeze(0)
     face_boxes = torch.from_numpy(np.array(face_box[:4], dtype=np.float32)).to(frames.device).unsqueeze(0)
@@ -18,11 +18,11 @@ def test_pytorch_impl(frame, face_box, target_size, polar, offset, restore, squa
 
     # Warping
     if polar > 1:
-        warped_frames = roi_tanh_circular_warp(frames, face_boxes, target_size,
-                                               angular_offsets=offset, padding='border')
+        warped_frames = roi_tanh_circular_warp(frames, face_boxes, target_size, angular_offsets=offset,
+                                               padding='border', keep_aspect_ratio=keep_aspect_ratio)
     elif polar > 0:
         warped_frames = roi_tanh_polar_warp(frames, face_boxes, target_size, angular_offsets=offset,
-                                            padding='border', no_stretching=no_stretching)
+                                            padding='border', keep_aspect_ratio=keep_aspect_ratio)
     else:
         warped_frames = roi_tanh_warp(frames, face_boxes, target_size, angular_offsets=offset, padding='border')
     warped_frame = warped_frames[0].detach().permute(1, 2, 0).cpu().numpy().astype(np.uint8)
@@ -33,11 +33,11 @@ def test_pytorch_impl(frame, face_box, target_size, polar, offset, restore, squa
         if polar > 1:
             restored_frames = roi_tanh_circular_restore(warped_frames, face_boxes, frames.size()[-2:],
                                                         angular_offsets=offset, interpolation=interpolation,
-                                                        padding='border')
+                                                        padding='border', keep_aspect_ratio=keep_aspect_ratio)
         elif polar > 0:
             restored_frames = roi_tanh_polar_restore(warped_frames, face_boxes, frames.size()[-2:],
                                                      angular_offsets=offset, interpolation=interpolation,
-                                                     padding='border', no_stretching=no_stretching)
+                                                     padding='border', keep_aspect_ratio=keep_aspect_ratio)
         else:
             restored_frames = roi_tanh_restore(warped_frames, face_boxes, frames.size()[-2:],
                                                angular_offsets=offset, interpolation=interpolation,
@@ -49,7 +49,7 @@ def test_pytorch_impl(frame, face_box, target_size, polar, offset, restore, squa
     return warped_frame, restored_frame
 
 
-def test_reference_impl(frame, face_box, target_size, polar, offset, restore, square, nearest, no_stretching):
+def test_reference_impl(frame, face_box, target_size, polar, offset, restore, square, nearest, keep_aspect_ratio):
     # Preparation
     if square:
         face_box = ref.make_square_rois(np.array(face_box))
@@ -57,10 +57,12 @@ def test_reference_impl(frame, face_box, target_size, polar, offset, restore, sq
     # Warping
     if polar > 1:
         warped_frame = ref.roi_tanh_circular_warp(frame, face_box, target_size, angular_offset=offset,
-                                                  border_mode=cv2.BORDER_REPLICATE)
+                                                  border_mode=cv2.BORDER_REPLICATE,
+                                                  keep_aspect_ratio=keep_aspect_ratio)
     elif polar > 0:
         warped_frame = ref.roi_tanh_polar_warp(frame, face_box, target_size, angular_offset=offset,
-                                               border_mode=cv2.BORDER_REPLICATE, no_stretching=no_stretching)
+                                               border_mode=cv2.BORDER_REPLICATE,
+                                               keep_aspect_ratio=keep_aspect_ratio)
     else:
         warped_frame = ref.roi_tanh_warp(frame, face_box, target_size, angular_offset=offset,
                                          border_mode=cv2.BORDER_REPLICATE)
@@ -71,12 +73,13 @@ def test_reference_impl(frame, face_box, target_size, polar, offset, restore, sq
         if polar > 1:
             restored_frame = ref.roi_tanh_circular_restore(warped_frame, face_box, frame.shape[:2],
                                                            angular_offset=offset, interpolation=interpolation,
-                                                           border_mode=cv2.BORDER_REPLICATE)
+                                                           border_mode=cv2.BORDER_REPLICATE,
+                                                           keep_aspect_ratio=keep_aspect_ratio)
         elif polar > 0:
             restored_frame = ref.roi_tanh_polar_restore(warped_frame, face_box, frame.shape[:2],
                                                         angular_offset=offset, interpolation=interpolation,
                                                         border_mode=cv2.BORDER_REPLICATE,
-                                                        no_stretching=no_stretching)
+                                                        keep_aspect_ratio=keep_aspect_ratio)
         else:
             restored_frame = ref.roi_tanh_restore(warped_frame, face_box, frame.shape[:2],
                                                   angular_offset=offset, interpolation=interpolation,
@@ -99,7 +102,7 @@ def main():
     parser.add_argument('-s', '--square', help='use square-shaped detection box', action='store_true')
     parser.add_argument('-n', '--nearest', help='use nearest-neighbour interpolation during restoration',
                         action='store_true')
-    parser.add_argument('-t', '--no-stretching', help='no stretching in tanh-polar or tanh-circular warping',
+    parser.add_argument('-k', '--keep-aspect-ratio', help='Keep aspect ratio in tanh-polar or tanh-circular warping',
                         action='store_true')
     args = parser.parse_args()
 
@@ -138,7 +141,8 @@ def main():
                     warped_frame, restored_frame = test_pytorch_impl(frame, face_boxes[biggest_face_idx],
                                                                      (args.height, args.width), args.polar,
                                                                      args.offset / 180.0 * np.pi, args.restore,
-                                                                     args.square, args.nearest, args.no_stretching)
+                                                                     args.square, args.nearest,
+                                                                     args.keep_aspect_ratio)
                     if args.compare:
                         ref_warped_frame, ref_restored_frame = test_reference_impl(frame,
                                                                                    face_boxes[biggest_face_idx],
@@ -146,7 +150,8 @@ def main():
                                                                                    args.polar,
                                                                                    args.offset / 180.0 * np.pi,
                                                                                    args.restore, args.square,
-                                                                                   args.nearest, args.no_stretching)
+                                                                                   args.nearest,
+                                                                                   args.keep_aspect_ratio)
                         diff_warped_frame = np.abs(ref_warped_frame.astype(int) -
                                                    warped_frame.astype(int)).astype(np.uint8)
                         if args.restore:

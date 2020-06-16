@@ -26,5 +26,5 @@ Command-line arguments:
 -c: To also compare with OpenCV-based reference implementation
 -s: To use square-shaped detection box
 -n: To use nearest-neighbour interpolation during restoration
--t: No strecthing in tanh-polar or tanh-circular warping
+-k: Keep aspect ratio in tanh-polar or tanh-circular warping
 ```
