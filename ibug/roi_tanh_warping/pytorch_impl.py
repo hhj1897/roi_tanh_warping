@@ -7,7 +7,8 @@ from typing import Tuple, Union
 __all__ = ['make_square_rois',
            'roi_tanh_warp', 'roi_tanh_restore',
            'roi_tanh_polar_warp', 'roi_tanh_polar_restore',
-           'roi_tanh_circular_warp', 'roi_tanh_circular_restore', 
+           'roi_tanh_circular_warp', 'roi_tanh_circular_restore',
+           'roi_tanh_polar_to_roi_tanh', 'roi_tanh_to_roi_tanh_polar',
            'get_warp_func', 'get_restore_func']
 
 
@@ -264,6 +265,18 @@ def roi_tanh_circular_restore(warped_images: torch.Tensor, rois: torch.Tensor, i
                         0.5) / (warped_height - 1.0) * 2.0 - 1.0
 
     return tf.grid_sample(warped_images, grids, mode=interpolation, padding_mode=padding, align_corners=True)
+
+
+def roi_tanh_polar_to_roi_tanh(warped_images: torch.Tensor, rois: torch.Tensor,
+                               target_size: Tuple[int, int] = (0, 0), interpolation: str = 'bilinear',
+                               padding: str = 'zeros', keep_aspect_ratio: bool = False):
+    return warped_images
+
+
+def roi_tanh_to_roi_tanh_polar(warped_images: torch.Tensor, rois: torch.Tensor,
+                               target_size: Tuple[int, int] = (0, 0), interpolation: str = 'bilinear',
+                               padding: str = 'zeros', keep_aspect_ratio: bool = False):
+    return warped_images
 
 
 def get_warp_func(polar: int):

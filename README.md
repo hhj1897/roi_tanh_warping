@@ -11,10 +11,12 @@ Differentiable implementation of some ROI-tanh warping methods.
 `pip install -e .`
 
 ## How to Test
-`python face_warping_test.py -v 0 -p 1 -r -t`
+```bash
+python face_warping_test.py -v 0 -p 1 -r -t
+```
 
 Command-line arguments:
-```
+``` bash
 -v VIDEO: Index of the webcam to use (start from 0)
 -x WIDTH: Width of the warped frames (default=256)
 -y HEIGHT: Height of the warped frames (default=256)
@@ -27,4 +29,22 @@ Command-line arguments:
 -s: To use square-shaped detection box
 -n: To use nearest-neighbour interpolation during restoration
 -k: Keep aspect ratio in tanh-polar or tanh-circular warping
+```
+
+There is also a script to specifically test the transform from ROI-tanh-polar space to the Cartesian ROI-tanh space (or in the reverse direction).
+
+```bash
+python tanh_polar_to_cartesian_test.py -v 0 -c -r
+```
+
+Command-line arguments:
+``` bash
+-v VIDEO: Index of the webcam to use (start from 0)
+-x WIDTH: Width of the warped frames (default=256)
+-y HEIGHT: Height of the warped frames (default=256)
+-o OFFSET: Angular offset in degrees (default=0)
+-r: To also show restored frames
+-c: To also compare with directly warped frames
+-k: Keep aspect ratio in tanh-polar or tanh-circular warping
+-i: To perform computation in the reverse direction
 ```
