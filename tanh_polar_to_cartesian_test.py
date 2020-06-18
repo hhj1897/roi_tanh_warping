@@ -9,59 +9,80 @@ from ibug.roi_tanh_warping import *
 from ibug.roi_tanh_warping import reference_impl as ref
 
 
-def test_reference_impl(frame, face_box, target_size, offset, restore, compare, keep_aspect_ratio, reverse):
+def test_pytorch_impl(frame, face_box, target_size, offset, restore, compare,
+                      compare_direct, keep_aspect_ratio, reverse):
+    # Preparation
+    frames = torch.from_numpy(frame.astype(np.float32)).to(torch.device('cuda:0')).permute(2, 0, 1).unsqueeze(0)
+    face_boxes = torch.from_numpy(np.array(face_box[:4], dtype=np.float32)).to(frames.device).unsqueeze(0)
+
     if reverse:
         # ROI-tanh warping
-        roi_tanh_frame = ref.roi_tanh_warp(frame, face_box, target_size, offset,
-                                           border_mode=cv2.BORDER_REPLICATE)
+        roi_tanh_frames = roi_tanh_warp(frames, face_boxes, target_size, offset, padding='border')
 
         # ROI-tanh to ROI-tanh-polar
-        roi_tanh_polar_frame = ref.roi_tanh_to_roi_tanh_polar(roi_tanh_frame, face_box,
-                                                              border_mode=cv2.BORDER_REPLICATE,
-                                                              keep_aspect_ratio=keep_aspect_ratio)
+        roi_tanh_polar_frames = roi_tanh_to_roi_tanh_polar(roi_tanh_frames, face_boxes, padding='border',
+                                                           keep_aspect_ratio=keep_aspect_ratio)
 
         # Restore from ROI-tanh-polar
         if restore:
-            restored_frame = ref.roi_tanh_polar_restore(roi_tanh_polar_frame, face_box, frame.shape[:2], offset,
-                                                        border_mode=cv2.BORDER_REPLICATE)
+            restored_frames = roi_tanh_polar_restore(roi_tanh_polar_frames, face_boxes, frame.shape[:2], offset,
+                                                     padding='border', keep_aspect_ratio=keep_aspect_ratio)
         else:
-            restored_frame = None
+            restored_frames = None
 
-        # Compute difference
-        if compare:
-            reference_frame = ref.roi_tanh_polar_warp(frame, face_box, target_size, offset,
-                                                      border_mode=cv2.BORDER_REPLICATE,
-                                                      keep_aspect_ratio=keep_aspect_ratio)
-            diff_frame = np.abs(reference_frame.astype(int) - roi_tanh_polar_frame.astype(int)).astype(np.uint8)
+        # Compute difference with direct warping
+        if compare_direct:
+            reference_frames = roi_tanh_polar_warp(frames, face_boxes, target_size, offset, padding='border',
+                                                   keep_aspect_ratio=keep_aspect_ratio)
+            diff_directs = torch.abs(reference_frames - roi_tanh_polar_frames)
         else:
-            diff_frame = None
+            diff_directs = None
     else:
         # ROI-tanh-polar warping
-        roi_tanh_polar_frame = ref.roi_tanh_polar_warp(frame, face_box, target_size, offset,
-                                                       border_mode=cv2.BORDER_REPLICATE,
-                                                       keep_aspect_ratio=keep_aspect_ratio)
+        roi_tanh_polar_frames = roi_tanh_polar_warp(frames, face_boxes, target_size, offset, padding='border',
+                                                    keep_aspect_ratio=keep_aspect_ratio)
 
         # ROI-tanh-polar to ROI-tanh
-        roi_tanh_frame = ref.roi_tanh_polar_to_roi_tanh(roi_tanh_polar_frame, face_box,
-                                                        border_mode=cv2.BORDER_REPLICATE,
-                                                        keep_aspect_ratio=keep_aspect_ratio)
+        roi_tanh_frames = roi_tanh_polar_to_roi_tanh(roi_tanh_polar_frames, face_boxes, padding='border',
+                                                     keep_aspect_ratio=keep_aspect_ratio)
 
         # Restore from ROI-tanh
         if restore:
-            restored_frame = ref.roi_tanh_restore(roi_tanh_frame, face_box, frame.shape[:2], offset,
-                                                  border_mode=cv2.BORDER_REPLICATE)
+            restored_frames = roi_tanh_restore(roi_tanh_frames, face_boxes, frame.shape[:2], offset, padding='border')
         else:
-            restored_frame = None
+            restored_frames = None
 
-        # Compute difference
-        if compare:
-            reference_frame = ref.roi_tanh_warp(frame, face_box, target_size, offset,
-                                                border_mode=cv2.BORDER_REPLICATE)
-            diff_frame = np.abs(reference_frame.astype(int) - roi_tanh_frame.astype(int)).astype(np.uint8)
+        # Compute difference with direct warping
+        if compare_direct:
+            reference_frames = roi_tanh_warp(frames, face_boxes, target_size, offset, padding='border')
+            diff_directs = torch.abs(reference_frames - roi_tanh_frames)
         else:
-            diff_frame = None
+            diff_directs = None
 
-    return roi_tanh_polar_frame, roi_tanh_frame, restored_frame, diff_frame
+    roi_tanh_polar_frame = roi_tanh_polar_frames[0].detach().permute(1, 2, 0).cpu().numpy().astype(np.uint8)
+    roi_tanh_frame = roi_tanh_frames[0].detach().permute(1, 2, 0).cpu().numpy().astype(np.uint8)
+    if restored_frames is None:
+        restored_frame = None
+    else:
+        restored_frame = restored_frames[0].detach().permute(1, 2, 0).cpu().numpy().astype(np.uint8)
+    if diff_directs is None:
+        diff_direct = None
+    else:
+        diff_direct = diff_directs[0].detach().permute(1, 2, 0).cpu().numpy().astype(np.uint8)
+    if compare:
+        if reverse:
+            ref_roi_tanh_polar_frame = ref.roi_tanh_to_roi_tanh_polar(roi_tanh_frame, face_box, target_size,
+                                                                      border_mode=cv2.BORDER_REPLICATE,
+                                                                      keep_aspect_ratio=keep_aspect_ratio)
+            diff_ref = np.abs(ref_roi_tanh_polar_frame.astype(int) - roi_tanh_polar_frame.astype(int)).astype(np.uint8)
+        else:
+            ref_roi_tanh_frame = ref.roi_tanh_polar_to_roi_tanh(roi_tanh_polar_frame, face_box, target_size,
+                                                                border_mode=cv2.BORDER_REPLICATE,
+                                                                keep_aspect_ratio=keep_aspect_ratio)
+            diff_ref = np.abs(ref_roi_tanh_frame.astype(int) - roi_tanh_frame.astype(int)).astype(np.uint8)
+    else:
+        diff_ref = None
+    return roi_tanh_polar_frame, roi_tanh_frame, restored_frame, diff_ref, diff_direct
 
 
 def main():
@@ -71,7 +92,8 @@ def main():
     parser.add_argument('-y', '--height', help='face height', type=int, default=256)
     parser.add_argument('-o', '--offset', help='angular offset, only used when polar>0', type=float, default=0.0)
     parser.add_argument('-r', '--restore', help='show restored frames', action='store_true')
-    parser.add_argument('-c', '--compare', help='compare with directly warped frames', action='store_true')
+    parser.add_argument('-c', '--compare', help='compare with reference implementation', action='store_true')
+    parser.add_argument('-d', '--compare-direct', help='compare with directly warped frames', action='store_true')
     parser.add_argument('-k', '--keep-aspect-ratio', help='Keep aspect ratio in tanh-polar or tanh-circular warping',
                         action='store_true')
     parser.add_argument('-i', '--reverse', help='perform computation in the reverse direction', action='store_true')
@@ -110,10 +132,9 @@ def main():
                                                       for bbox in face_boxes]))
 
                     # Test the warping functions
-                    roi_tanh_polar_frame, roi_tanh_frame, restored_frame, diff_frame = test_reference_impl(
-                        frame, face_boxes[biggest_face_idx], (args.height, args.width),
-                        args.offset / 180.0 * np.pi, args.restore, args.compare,
-                        args.keep_aspect_ratio, args.reverse)
+                    roi_tanh_polar_frame, roi_tanh_frame, restored_frame, diff_ref, diff_direct = test_pytorch_impl(
+                        frame, face_boxes[biggest_face_idx], (args.height, args.width), args.offset / 180.0 * np.pi,
+                        args.restore, args.compare, args.compare_direct, args.keep_aspect_ratio, args.reverse)
 
                     # Rendering
                     for idx, bbox in enumerate(face_boxes):
@@ -127,7 +148,8 @@ def main():
                     roi_tanh_polar_frame = None
                     roi_tanh_frame = None
                     restored_frame = None
-                    diff_frame = None
+                    diff_ref = None
+                    diff_direct = None
 
                 # Show the result
                 print('Frame #%d: %d faces(s) detected.' % (frame_number, len(face_boxes)))
@@ -155,11 +177,16 @@ def main():
                         cv2.destroyWindow('Restored')
                     else:
                         cv2.imshow('Restored', restored_frame)
-                if args.compare:
-                    if diff_frame is None:
-                        cv2.destroyWindow('Difference')
+                if args.compare_direct:
+                    if diff_direct is None:
+                        cv2.destroyWindow('Diff-w-Direct')
                     else:
-                        cv2.imshow('Difference', diff_frame)
+                        cv2.imshow('Diff-w-Direct', diff_direct)
+                if args.compare:
+                    if diff_ref is None:
+                        cv2.destroyWindow('Diff-w-Ref')
+                    else:
+                        cv2.imshow('Diff-w-Ref', diff_ref)
                 key = cv2.waitKey(1) % 2 ** 16
                 if key == ord('q') or key == ord('Q'):
                     print("\'Q\' pressed, we are done here.")

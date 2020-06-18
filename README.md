@@ -12,7 +12,7 @@ Differentiable implementation of some ROI-tanh warping methods.
 
 ## How to Test
 ```bash
-python face_warping_test.py -v 0 -p 1 -r -t
+python face_warping_test.py -v 0 -p 1 -r -k
 ```
 
 Command-line arguments:
@@ -34,7 +34,7 @@ Command-line arguments:
 There is also a script to specifically test the transform from ROI-tanh-polar space to the Cartesian ROI-tanh space (or in the reverse direction).
 
 ```bash
-python tanh_polar_to_cartesian_test.py -v 0 -c -r
+python tanh_polar_to_cartesian_test.py -v 0 -r -k
 ```
 
 Command-line arguments:
@@ -44,7 +44,8 @@ Command-line arguments:
 -y HEIGHT: Height of the warped frames (default=256)
 -o OFFSET: Angular offset in degrees (default=0)
 -r: To also show restored frames
--c: To also compare with directly warped frames
+-c: To also compare with OpenCV-based reference implementation
+-d: To also compare with directly warped frames
 -k: Keep aspect ratio in tanh-polar or tanh-circular warping
 -i: To perform computation in the reverse direction
 ```
