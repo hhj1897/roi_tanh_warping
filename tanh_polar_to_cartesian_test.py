@@ -3,7 +3,7 @@ import cv2
 import torch
 import numpy as np
 from argparse import ArgumentParser
-from saic_vision.object_detector import S3FMobileV2Detector
+from ibug.face_detection import RetinaFacePredictor
 
 from ibug.roi_tanh_warping import *
 from ibug.roi_tanh_warping import reference_impl as ref
@@ -87,24 +87,31 @@ def test_pytorch_impl(frame, face_box, target_size, offset, restore, compare,
 
 def main():
     parser = ArgumentParser()
-    parser.add_argument('-v', '--video', help='video source')
-    parser.add_argument('-x', '--width', help='face width', type=int, default=256)
-    parser.add_argument('-y', '--height', help='face height', type=int, default=256)
-    parser.add_argument('-o', '--offset', help='angular offset, only used when polar>0', type=float, default=0.0)
-    parser.add_argument('-r', '--restore', help='show restored frames', action='store_true')
-    parser.add_argument('-c', '--compare', help='compare with reference implementation', action='store_true')
-    parser.add_argument('-d', '--compare-direct', help='compare with directly warped frames', action='store_true')
-    parser.add_argument('-k', '--keep-aspect-ratio', help='Keep aspect ratio in tanh-polar or tanh-circular warping',
-                        action='store_true')
-    parser.add_argument('-i', '--reverse', help='perform computation in the reverse direction', action='store_true')
+    parser.add_argument('--video', '-v', help='video source')
+    parser.add_argument('--width', '-x', help='face width', type=int, default=256)
+    parser.add_argument('--height', '-y', help='face height', type=int, default=256)
+    parser.add_argument('--offset', '-o', help='angular offset, only used when polar>0', type=float, default=0.0)
+    parser.add_argument('--restore', '-r', help='show restored frames',
+                        action='store_true', default=False)
+    parser.add_argument('--compare', '-c', help='compare with reference implementation',
+                        action='store_true', default=False)
+    parser.add_argument('--compare-direct', '-t', help='compare with directly warped frames',
+                        action='store_true', default=False)
+    parser.add_argument('--keep-aspect-ratio', '-k', help='Keep aspect ratio in tanh-polar or tanh-circular warping',
+                        action='store_true', default=False)
+    parser.add_argument('--reverse', '-i', help='perform computation in the reverse direction',
+                        action='store_true', default=False)
+    parser.add_argument('--device', '-d', help='Device to be used (default=cuda:0)', default='cuda:0')
+    parser.add_argument('--benchmark', '-b', help='Enable benchmark mode for CUDNN',
+                        action='store_true', default=False)
     args = parser.parse_args()
 
     # Make the models run a bit faster
-    torch.backends.cudnn.benchmark = True
+    torch.backends.cudnn.benchmark = args.benchmark
 
-    # Create object detector
-    detector = S3FMobileV2Detector(th=0.25, device='cuda:0')
-    print('S3FD object detector created.')
+    # Create face detector
+    detector = RetinaFacePredictor(device=args.device, model=RetinaFacePredictor.get_model('mobilenet0.25'))
+    print('RetinaFace detector created using mobilenet0.25 backbone.')
 
     # Open webcam
     if os.path.exists(args.video):
@@ -125,8 +132,7 @@ def main():
                 break
             else:
                 # Face detection
-                bboxes, labels, probs = detector.detect_from_image(frame)
-                face_boxes = [bboxes[idx] for idx, label in enumerate(labels) if label == 1]
+                face_boxes = detector(frame, rgb=False)
                 if len(face_boxes) > 0:
                     biggest_face_idx = int(np.argmax([(bbox[3] - bbox[1]) * (bbox[2] - bbox[0])
                                                       for bbox in face_boxes]))
