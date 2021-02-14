@@ -1,6 +1,19 @@
 # ROI Tanh Warping
 Differentiable implementation of some ROI-tanh warping methods.
 
+__Note__: If you use this repository in your research, we kindly rquest you to cite the following paper:
+
+```bibtex
+@misc{lin2021roi,
+      title={RoI Tanh-polar Transformer Network for Face Parsing in the Wild}, 
+      author={Yiming Lin and Jie Shen and Yujiang Wang and Maja Pantic},
+      year={2021},
+      eprint={2102.02717},
+      archivePrefix={arXiv},
+      primaryClass={cs.CV}
+}
+```
+
 ## Dependencies
 * pytorch
 * \[optional\] numpy
