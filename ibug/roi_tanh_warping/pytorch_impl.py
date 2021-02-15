@@ -1,7 +1,7 @@
 import math
 import torch
 import torch.nn.functional as tf
-from typing import Tuple, Union
+from typing import Tuple, Union, Callable
 
 
 __all__ = ['make_square_rois',
@@ -16,7 +16,7 @@ def arctanh(x: torch.Tensor) -> torch.Tensor:
     return torch.log((1.0 + x) / (1.0 - x).clamp(1e-9)) / 2.0
 
 
-def make_square_rois(rois: torch.Tensor, opt=0) -> torch.Tensor:
+def make_square_rois(rois: torch.Tensor, opt: int = 0) -> torch.Tensor:
     roi_sizes = (rois[..., 2:4] - rois[..., :2])
     if opt < 0:
         target_sizes = roi_sizes.min(dim=-1)[0]
@@ -269,7 +269,7 @@ def roi_tanh_circular_restore(warped_images: torch.Tensor, rois: torch.Tensor, i
 
 def roi_tanh_polar_to_roi_tanh(warped_images: torch.Tensor, rois: torch.Tensor,
                                target_size: Tuple[int, int] = (0, 0), interpolation: str = 'bilinear',
-                               padding: str = 'zeros', keep_aspect_ratio: bool = False):
+                               padding: str = 'zeros', keep_aspect_ratio: bool = False) -> torch.Tensor:
     if target_size[0] <= 0 or target_size[1] <= 0:
         target_size = warped_images.size()[-2:]
     warped_height, warped_width = warped_images.size()[-2:]
@@ -308,7 +308,7 @@ def roi_tanh_polar_to_roi_tanh(warped_images: torch.Tensor, rois: torch.Tensor,
 
 def roi_tanh_to_roi_tanh_polar(warped_images: torch.Tensor, rois: torch.Tensor,
                                target_size: Tuple[int, int] = (0, 0), interpolation: str = 'bilinear',
-                               padding: str = 'zeros', keep_aspect_ratio: bool = False):
+                               padding: str = 'zeros', keep_aspect_ratio: bool = False) -> torch.Tensor:
     if target_size[0] <= 0 or target_size[1] <= 0:
         target_size = warped_images.size()[-2:]
     warped_height, warped_width = warped_images.size()[-2:]
@@ -344,19 +344,25 @@ def roi_tanh_to_roi_tanh_polar(warped_images: torch.Tensor, rois: torch.Tensor,
     return tf.grid_sample(warped_images, grids, mode=interpolation, padding_mode=padding, align_corners=True)
 
 
-def get_warp_func(polar: int):
-    if polar == 0:
+def get_warp_func(variant: str = 'cartesian') -> Callable[..., torch.Tensor]:
+    variant = variant.lower().strip()
+    if variant == 'cartesian':
         return roi_tanh_warp
-    elif polar == 1:
+    elif variant == 'polar':
+        return roi_tanh_polar_warp
+    if variant == 'circular':
         return roi_tanh_circular_warp
     else:
-        return roi_tanh_polar_warp
+        raise ValueError('variant must be set to either cartesian, polar, or circular')
 
 
-def get_restore_func(polar: int):
-    if polar == 0:
+def get_restore_func(variant: str = 'cartesian') -> Callable[..., torch.Tensor]:
+    variant = variant.lower().strip()
+    if variant == 'cartesian':
         return roi_tanh_restore
-    elif polar == 1:
+    elif variant == 'polar':
+        return roi_tanh_polar_restore
+    if variant == 'circular':
         return roi_tanh_circular_restore
     else:
-        return roi_tanh_polar_restore
+        raise ValueError('variant must be set to either cartesian, polar, or circular')

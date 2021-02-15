@@ -1,4 +1,4 @@
-# ROI Tanh Warping
+# ibug.roi_tanh_warping
 Differentiable implementation of some ROI-tanh warping methods.
 
 __Note__: If you use this repository in your research, we kindly rquest you to cite the following paper:
