@@ -11,6 +11,7 @@ from ibug.roi_tanh_warping import *
 from ibug.roi_tanh_warping import reference_impl as ref
 
 
+@torch.no_grad()
 def test_pytorch_impl(device: str, frame: np.ndarray, face_box: np.ndarray, target_width: int, target_height: int,
                       polar: int, offset: float, restore: bool, square: bool, nearest: bool,
                       keep_aspect_ratio: bool) -> Tuple[np.ndarray, Optional[np.ndarray]]:
@@ -32,7 +33,7 @@ def test_pytorch_impl(device: str, frame: np.ndarray, face_box: np.ndarray, targ
     else:
         warped_frames = roi_tanh_warp(frames, face_boxes, target_width, target_height,
                                       angular_offsets=offset, padding='border')
-    warped_frame = warped_frames[0].detach().permute(1, 2, 0).cpu().numpy().astype(np.uint8)
+    warped_frame = warped_frames[0].permute(1, 2, 0).cpu().numpy().astype(np.uint8)
 
     # Restoration
     interpolation = 'nearest' if nearest else 'bilinear'
@@ -49,7 +50,7 @@ def test_pytorch_impl(device: str, frame: np.ndarray, face_box: np.ndarray, targ
             restored_frames = roi_tanh_restore(warped_frames, face_boxes, *frames.size()[:-3:-1],
                                                angular_offsets=offset, interpolation=interpolation,
                                                padding='border')
-        restored_frame = restored_frames[0].detach().permute(1, 2, 0).cpu().numpy().astype(np.uint8)
+        restored_frame = restored_frames[0].permute(1, 2, 0).cpu().numpy().astype(np.uint8)
     else:
         restored_frame = None
 

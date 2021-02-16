@@ -11,6 +11,7 @@ from ibug.roi_tanh_warping import *
 from ibug.roi_tanh_warping import reference_impl as ref
 
 
+@torch.no_grad()
 def test_pytorch_impl(device: str, frame: np.ndarray, face_box: np.ndarray, target_width: int, target_height: int,
                       offset: float, restore: bool, compare: bool, compare_direct: bool, square: bool,
                       keep_aspect_ratio: bool, reverse: bool) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray],
@@ -67,16 +68,16 @@ def test_pytorch_impl(device: str, frame: np.ndarray, face_box: np.ndarray, targ
         else:
             diff_directs = None
 
-    roi_tanh_polar_frame = roi_tanh_polar_frames[0].detach().permute(1, 2, 0).cpu().numpy().astype(np.uint8)
-    roi_tanh_frame = roi_tanh_frames[0].detach().permute(1, 2, 0).cpu().numpy().astype(np.uint8)
+    roi_tanh_polar_frame = roi_tanh_polar_frames[0].permute(1, 2, 0).cpu().numpy().astype(np.uint8)
+    roi_tanh_frame = roi_tanh_frames[0].permute(1, 2, 0).cpu().numpy().astype(np.uint8)
     if restored_frames is None:
         restored_frame = None
     else:
-        restored_frame = restored_frames[0].detach().permute(1, 2, 0).cpu().numpy().astype(np.uint8)
+        restored_frame = restored_frames[0].permute(1, 2, 0).cpu().numpy().astype(np.uint8)
     if diff_directs is None:
         diff_direct = None
     else:
-        diff_direct = diff_directs[0].detach().permute(1, 2, 0).cpu().numpy().astype(np.uint8)
+        diff_direct = diff_directs[0].permute(1, 2, 0).cpu().numpy().astype(np.uint8)
     if compare:
         if reverse:
             ref_roi_tanh_polar_frame = ref.roi_tanh_to_roi_tanh_polar(
