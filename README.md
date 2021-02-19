@@ -34,7 +34,7 @@ python face_warping_test.py -v 0 -p 1 -r -k
 
 Command-line arguments:
 ```
--v VIDEO: Index of the webcam to use (start from 0) or
+-v VIDEO: Index of the webcam to use (default=0) or
           path of the input video file
 -x WIDTH: Width of the warped frames (default=256)
 -y HEIGHT: Height of the warped frames (default=256)
@@ -47,8 +47,14 @@ Command-line arguments:
 -s: To use square-shaped detection box
 -n: To use nearest-neighbour interpolation during restoration
 -k: Keep aspect ratio in tanh-polar or tanh-circular warping
--d: Device to be used by PyTorch (default=cuda:0)
+-d: Device to be used by the warping functions (default=cuda:0)
 -b: Enable benchmark mode for CUDNN
+-dt: Confidence threshold for face detection (default=0.8)
+-dm: Face detection method, can be either RatinaFace (default)
+     or S3FD
+-dw: Weights to be loaded for face detection, can be either
+     resnet50 or mobilenet0.25 when using RetinaFace
+-dd: Device to be used for face detection (default=cuda:0)
 ```
 
 There is also a script to specifically test the transform from ROI-tanh-polar space to the Cartesian ROI-tanh space (or in the reverse direction).
@@ -59,7 +65,7 @@ python tanh_polar_to_cartesian_test.py -v 0 -r -k
 
 Command-line arguments:
 ```
--v VIDEO: Index of the webcam to use (start from 0) or
+-v VIDEO: Index of the webcam to use (default=0) or
           path of the input video file
 -x WIDTH: Width of the warped frames (default=256)
 -y HEIGHT: Height of the warped frames (default=256)
@@ -70,6 +76,12 @@ Command-line arguments:
 -s: To use square-shaped detection box
 -k: Keep aspect ratio in tanh-polar or tanh-circular warping
 -i: To perform computation in the reverse direction
--d: Device to be used by PyTorch (default=cuda:0)
+-d: Device to be used by the warping functions (default=cuda:0)
 -b: Enable benchmark mode for CUDNN
+-dt: Confidence threshold for face detection (default=0.8)
+-dm: Face detection method, can be either RatinaFace (default)
+     or S3FD
+-dw: Weights to be loaded for face detection, can be either
+     resnet50 or mobilenet0.25 when using RetinaFace
+-dd: Device to be used for face detection (default=cuda:0)
 ```

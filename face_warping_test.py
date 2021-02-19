@@ -5,7 +5,7 @@ import torch
 import numpy as np
 from typing import Tuple, Optional
 from argparse import ArgumentParser
-from ibug.face_detection import RetinaFacePredictor
+from ibug.face_detection import RetinaFacePredictor, S3FDPredictor
 
 from ibug.roi_tanh_warping import *
 from ibug.roi_tanh_warping import reference_impl as ref
@@ -102,7 +102,7 @@ def test_reference_impl(frame: np.ndarray, face_box: np.ndarray, target_width: i
 
 def main() -> None:
     parser = ArgumentParser()
-    parser.add_argument('--video', '-v', help='Video source')
+    parser.add_argument('--video', '-v', help='Video source (default=0)', default=0)
     parser.add_argument('--width', '-x', help='Width of the warped image (default=256)', type=int, default=256)
     parser.add_argument('--height', '-y', help='Height of the warped image (default=256)', type=int, default=256)
     parser.add_argument('--polar', '-p', help='Use polar coordinates', type=int, default=0)
@@ -117,17 +117,38 @@ def main() -> None:
                         action='store_true', default=False)
     parser.add_argument('--keep-aspect-ratio', '-k', help='Keep aspect ratio in tanh-polar or tanh-circular warping',
                         action='store_true', default=False)
-    parser.add_argument('--device', '-d', help='Device to be used by PyTorch (default=cuda:0)', default='cuda:0')
+    parser.add_argument('--device', '-d', default='cuda:0',
+                        help='Device to be used by the warping functions (default=cuda:0)')
     parser.add_argument('--benchmark', '-b', help='Enable benchmark mode for CUDNN',
                         action='store_true', default=False)
+    parser.add_argument('--detection-threshold', '-dt', type=float, default=0.8,
+                        help='Confidence threshold for face detection (default=0.8)')
+    parser.add_argument('--detection-method', '-dm', default='retinaface',
+                        help='Face detection method, can be either RatinaFace or S3FD (default=RatinaFace)')
+    parser.add_argument('--detection-weights', '-dw', default=None,
+                        help='Weights to be loaded for face detection, ' +
+                             'can be either resnet50 or mobilenet0.25 when using RetinaFace')
+    parser.add_argument('--detection-device', '-dd', default='cuda:0',
+                        help='Device to be used for face detection (default=cuda:0)')
     args = parser.parse_args()
 
     # Make the models run a bit faster
     torch.backends.cudnn.benchmark = args.benchmark
 
-    # Create object detector
-    detector = RetinaFacePredictor(device=args.device, model=RetinaFacePredictor.get_model('mobilenet0.25'))
-    print('RetinaFace detector created using mobilenet0.25 backbone.')
+    # Create the face detector
+    args.detection_method = args.detection_method.lower()
+    if args.detection_method == 'retinaface':
+        face_detector = RetinaFacePredictor(threshold=args.detection_threshold, device=args.detection_device,
+                                            model=(RetinaFacePredictor.get_model(args.detection_weights)
+                                                   if args.detection_weights else None))
+        print('Face detector created using RetinaFace.')
+    elif args.detection_method == 's3fd':
+        face_detector = S3FDPredictor(threshold=args.detection_threshold, device=args.detection_device,
+                                      model=(S3FDPredictor.get_model(args.detection_weights)
+                                             if args.detection_weights else None))
+        print('Face detector created using S3FD.')
+    else:
+        raise ValueError('detector-method must be set to either RetinaFace or S3FD')
 
     # Open webcam
     if os.path.exists(args.video):
@@ -148,7 +169,7 @@ def main() -> None:
                 break
             else:
                 # Face detection
-                face_boxes = detector(frame, rgb=False)
+                face_boxes = face_detector(frame, rgb=False)
                 if len(face_boxes) > 0:
                     biggest_face_idx = int(np.argmax([(bbox[3] - bbox[1]) * (bbox[2] - bbox[0])
                                                       for bbox in face_boxes]))
